@@ -4,56 +4,77 @@ import io.vertx.core.*;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class MainVerticle extends AbstractVerticle {
 
-  private Map<String, String> requestResultsMap;
+  private List<JsonObject> resultList;
 
   public MainVerticle() {
-    this.requestResultsMap = new HashMap<>();
+    this.resultList = new ArrayList<>();
   }
 
-  private static Future<String> deploy(Vertx vertx, Verticle verticle) {
+  private static Future<String> deployWebClientVerticle(Vertx vertx, String url) {
     Promise<String> promise = Promise.promise();
-    vertx.deployVerticle(verticle, promise);
+    vertx.deployVerticle(new WebClientVerticle(url), promise);
 
     return promise.future();
   }
 
   @Override
   public void start(Promise startPromise) {
-
     List<Future<String>> futureList = Arrays.asList(
-      deploy(vertx, new WebpageVerticle("youtube.com")),
-      deploy(vertx, new WebpageVerticle("google.com")),
-      deploy(vertx, new WebpageVerticle("reddit.com")),
-      deploy(vertx, new WebpageVerticle("facebook"))
+      deployWebClientVerticle(vertx, "youtube.com"),
+      deployWebClientVerticle(vertx, "google.com"),
+      deployWebClientVerticle(vertx, "reddit.com"),
+      deployWebClientVerticle(vertx, "facebook.com")
     );
 
-    MessageConsumer<JsonObject> msg = vertx.eventBus().consumer("report");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("report");
 
-    msg.handler(ar -> requestResultsMap.put(ar.body().getString("url"), ar.body().getString("body")));
+    consumer.handler(ar -> resultList.add(ar.body()));
 
     CompositeFuture.join(new ArrayList<>(futureList))
       .setHandler(ar -> {
-        if (ar.failed()) {
-          System.out.println("1 or more web requests failed");
-        }
         report();
 
         vertx.deploymentIDs().forEach(id -> vertx.undeploy(id));
       });
-
   }
 
   private void report() {
+    System.out.println("REPORT");
+    System.out.println("----------------------------------------");
 
-    System.out.println("REPORT:");
+    long succeededCount = resultList.stream()
+      .filter(r -> r.getBoolean("success")).count();
 
-    requestResultsMap.forEach((k, v) -> System.out.println("PAGE: " + k + " SIZE (bytes): " + v.length()));
+    System.out.println(succeededCount + " requests succeeded " + (resultList.size() - succeededCount) + " failed");
+    System.out.println();
 
-    int totalBytes = requestResultsMap.values().stream().mapToInt(String::length).sum();
-    System.out.println("TOTAL SIZE (bytes): " + totalBytes);
+    // Display each web page request results
+    resultList.forEach(r -> {
+      boolean success = r.getBoolean("success");
+      System.out.print("SUCCESS: " + success + " URL: " + r.getString("url"));
+      if (success) {
+        System.out.print(" SIZE (bytes): " + r.getInteger("bodySize"));
+      }
+      System.out.println();
+    });
+
+    System.out.println();
+
+    int total = resultList.stream()
+      .filter(r -> r.getBoolean("success"))
+      .map(r -> r.getInteger("bodySize"))
+      .reduce(0, Integer::sum);
+
+    long avg = total / succeededCount;
+
+    System.out.println("TOTAL SIZE (bytes): " + total);
+    System.out.println("AVERAGE SIZE (bytes): " + avg);
+    System.out.println("----------------------------------------");
   }
 }
