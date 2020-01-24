@@ -30,9 +30,10 @@ public class WebClientVerticle extends AbstractVerticle {
 
           if (ar.succeeded()) {
             HttpResponse<Buffer> response = ar.result();
-            System.out.println("Received response from " + this.url + " with status code " + response.statusCode());
+            String responseBody = response.bodyAsString();
 
-            jsonResult.put("success", true).put("body", response.bodyAsString());
+            System.out.println("Received response from " + this.url + " with status code " + response.statusCode());
+            jsonResult.put("success", true).put("body", responseBody).put("bodySize", responseBody.length());
 
             eventBus.send("report", jsonResult);
 
