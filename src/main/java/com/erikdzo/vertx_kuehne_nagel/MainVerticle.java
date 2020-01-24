@@ -10,10 +10,10 @@ import java.util.List;
 
 public class MainVerticle extends AbstractVerticle {
 
-  private List<JsonObject> resultList;
+  private List<JsonObject> reportMessageList;
 
   public MainVerticle() {
-    this.resultList = new ArrayList<>();
+    this.reportMessageList = new ArrayList<>();
   }
 
   private static Future<String> deployWebClientVerticle(Vertx vertx, String url) {
@@ -24,20 +24,21 @@ public class MainVerticle extends AbstractVerticle {
   }
 
   @Override
-  public void start(Promise startPromise) {
+  public void start() {
+
     List<Future<String>> futureList = Arrays.asList(
-      deployWebClientVerticle(vertx, "youtube.com"),
-      deployWebClientVerticle(vertx, "google.com"),
-      deployWebClientVerticle(vertx, "reddit.com"),
-      deployWebClientVerticle(vertx, "facebook.com")
+      deployWebClientVerticle(vertx, "https://www.youtube.com/"),
+      deployWebClientVerticle(vertx, "https://www.google.com/"),
+      deployWebClientVerticle(vertx, "https://www.face"),
+      deployWebClientVerticle(vertx, "https://jsonplaceholder.typicode.com/posts/1")
     );
 
     MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("report");
 
-    consumer.handler(ar -> resultList.add(ar.body()));
+    consumer.handler(message -> reportMessageList.add(message.body()));
 
     CompositeFuture.join(new ArrayList<>(futureList))
-      .setHandler(ar -> {
+      .onComplete(handler -> {
         report();
 
         vertx.deploymentIDs().forEach(id -> vertx.undeploy(id));
@@ -45,36 +46,53 @@ public class MainVerticle extends AbstractVerticle {
   }
 
   private void report() {
-    System.out.println("REPORT");
-    System.out.println("----------------------------------------");
+    String report = "";
 
-    long succeededCount = resultList.stream()
-      .filter(r -> r.getBoolean("success")).count();
+    report += reportHeader();
+    report += reportContent();
+    report += reportFooter();
 
-    System.out.println(succeededCount + " requests succeeded " + (resultList.size() - succeededCount) + " failed");
-    System.out.println();
+    System.out.println(report);
+  }
+
+  private String reportHeader() {
+    return String.format("%s\n%s\n", "REPORT", "----------------------------------------");
+  }
+
+  private String reportContent() {
+    String content = "";
+
+    long succeededCount = reportMessageList.stream()
+      .filter(message -> message.getBoolean("success")).count();
+
+    content += String.format("%d requests succeeded %d failed\n", succeededCount, reportMessageList.size() - succeededCount);
 
     // Display each web page request results
-    resultList.forEach(r -> {
-      boolean success = r.getBoolean("success");
-      System.out.print("SUCCESS: " + success + " URL: " + r.getString("url"));
-      if (success) {
-        System.out.print(" SIZE (bytes): " + r.getInteger("bodySize"));
-      }
-      System.out.println();
-    });
+    content += reportMessageList.stream().map(this::reportMessageStr).reduce("", String::concat);
 
-    System.out.println();
-
-    int total = resultList.stream()
-      .filter(r -> r.getBoolean("success"))
-      .map(r -> r.getInteger("bodySize"))
+    int total = reportMessageList.stream()
+      .filter(message -> message.getBoolean("success"))
+      .map(message -> message.getInteger("bodySize"))
       .reduce(0, Integer::sum);
 
     long avg = total / succeededCount;
 
-    System.out.println("TOTAL SIZE (bytes): " + total);
-    System.out.println("AVERAGE SIZE (bytes): " + avg);
-    System.out.println("----------------------------------------");
+    content += String.format("TOTAL SIZE (bytes): %d\n", total);
+    content += String.format("AVERAGE SIZE (bytes): %d\n", avg);
+    return content;
+  }
+
+  private String reportMessageStr(JsonObject response) {
+    boolean success = response.getBoolean("success");
+
+    if (success) {
+      return String.format("URL: %s SUCCESS: %b SIZE (bytes): %d\n", response.getString("url"), success, response.getInteger("bodySize"));
+    } else {
+      return String.format("URL: %s SUCCESS: %b\n", response.getString("url"), success);
+    }
+  }
+
+  private String reportFooter() {
+    return "----------------------------------------";
   }
 }
