@@ -49,9 +49,4 @@ public class WebClientVerticle extends AbstractVerticle {
         }
       );
   }
-
-  @Override
-  public void stop() {
-    System.out.println("Stopping WebClientVerticle...");
-  }
 }
