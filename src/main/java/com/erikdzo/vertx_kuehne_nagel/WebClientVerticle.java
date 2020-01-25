@@ -35,14 +35,14 @@ public class WebClientVerticle extends AbstractVerticle {
             System.out.printf("Received response from %s with status code %d\n", this.url, response.statusCode());
 
             jsonResult.put("success", true).put("bodySize", responseBody.length());
-            eventBus.send("report", jsonResult);
+            eventBus.send("succeeded", jsonResult);
 
             startPromise.complete();
           } else {
             System.out.printf("Something went wrong: %s\n", ar.cause().getMessage());
 
             jsonResult.put("success", false);
-            eventBus.send("report", jsonResult);
+            eventBus.send("failed", jsonResult);
 
             startPromise.fail(String.format("Requesting %s failed", this.url));
           }
