@@ -10,10 +10,12 @@ import java.util.List;
 
 public class MainVerticle extends AbstractVerticle {
 
-  private List<JsonObject> reportMessageList;
+  private List<JsonObject> succeededRequestList;
+  private List<JsonObject> failedRequestsList;
 
   public MainVerticle() {
-    this.reportMessageList = new ArrayList<>();
+    this.succeededRequestList = new ArrayList<>();
+    this.failedRequestsList = new ArrayList<>();
   }
 
   private static Future<String> deployWebClientVerticle(Vertx vertx, String url) {
@@ -33,26 +35,28 @@ public class MainVerticle extends AbstractVerticle {
       deployWebClientVerticle(vertx, "https://jsonplaceholder.typicode.com/posts/1")
     );
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("report");
+    MessageConsumer<JsonObject> successConsumer = vertx.eventBus().consumer("succeeded");
+    MessageConsumer<JsonObject> failureConsumer = vertx.eventBus().consumer("failed");
 
-    consumer.handler(message -> reportMessageList.add(message.body()));
+    successConsumer.handler(message -> succeededRequestList.add(message.body()));
+    failureConsumer.handler(message -> failedRequestsList.add(message.body()));
 
     CompositeFuture.join(new ArrayList<>(futureList))
       .onComplete(handler -> {
-        report();
+        System.out.println(report());
 
         vertx.deploymentIDs().forEach(id -> vertx.undeploy(id));
       });
   }
 
-  private void report() {
+  private String report() {
     String report = "";
 
     report += reportHeader();
     report += reportContent();
     report += reportFooter();
 
-    System.out.println(report);
+    return report;
   }
 
   private String reportHeader() {
@@ -62,34 +66,37 @@ public class MainVerticle extends AbstractVerticle {
   private String reportContent() {
     String content = "";
 
-    long succeededCount = reportMessageList.stream()
-      .filter(message -> message.getBoolean("success")).count();
+    content += String.format("%d requests succeeded %d failed\n", succeededRequestList.size(), failedRequestsList.size());
 
-    content += String.format("%d requests succeeded %d failed\n", succeededCount, reportMessageList.size() - succeededCount);
+    // Display each web page request results by success
+    if (!succeededRequestList.isEmpty()) {
+      content += "SUCCEEDED:\n";
+      content += succeededRequestList.stream().map(this::formatSucceededRequest).reduce("", String::concat);
+    }
+    if (!failedRequestsList.isEmpty()) {
+      content += "FAILED:\n";
+      content += failedRequestsList.stream().map(this::formatFailedRequest).reduce("", String::concat);
+    }
 
-    // Display each web page request results
-    content += reportMessageList.stream().map(this::reportMessageStr).reduce("", String::concat);
-
-    int total = reportMessageList.stream()
+    int total = succeededRequestList.stream()
       .filter(message -> message.getBoolean("success"))
       .map(message -> message.getInteger("bodySize"))
       .reduce(0, Integer::sum);
 
-    long avg = total / succeededCount;
+    long avg = total / succeededRequestList.size();
 
     content += String.format("TOTAL SIZE (bytes): %d\n", total);
     content += String.format("AVERAGE SIZE (bytes): %d\n", avg);
+
     return content;
   }
 
-  private String reportMessageStr(JsonObject response) {
-    boolean success = response.getBoolean("success");
+  private String formatSucceededRequest(JsonObject requestJson) {
+    return String.format("URL: %s SIZE (bytes): %d\n", requestJson.getString("url"), requestJson.getInteger("bodySize"));
+  }
 
-    if (success) {
-      return String.format("URL: %s SUCCESS: %b SIZE (bytes): %d\n", response.getString("url"), success, response.getInteger("bodySize"));
-    } else {
-      return String.format("URL: %s SUCCESS: %b\n", response.getString("url"), success);
-    }
+  private String formatFailedRequest(JsonObject requestJson) {
+    return String.format("URL: %s\n", requestJson.getString("url"));
   }
 
   private String reportFooter() {
