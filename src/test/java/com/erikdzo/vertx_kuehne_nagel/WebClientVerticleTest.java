@@ -1,5 +1,7 @@
 package com.erikdzo.vertx_kuehne_nagel;
 
+import com.erikdzo.vertx_kuehne_nagel.utils.EventAddress;
+import com.erikdzo.vertx_kuehne_nagel.utils.ResultMessage;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.MessageConsumer;
@@ -46,20 +48,42 @@ class WebClientVerticleTest {
   }
 
   @Test
+  public void webClientVerticleURLNullSendFailedMessage(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle(null);
+
+    vertx.deployVerticle(webClientVerticle);
+
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
+
+    consumer.handler(message -> testContext.completeNow());
+  }
+
+  @Test
+  public void webClientVerticleURLPlainStringSendsFailedMessage(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle("test string");
+
+    vertx.deployVerticle(webClientVerticle);
+
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
+
+    consumer.handler(message -> testContext.completeNow());
+  }
+
+  @Test
   @Timeout(value = 5, timeUnit = TimeUnit.SECONDS)
-  public void successfulRequestSendEventBusMessage(Vertx vertx, VertxTestContext testContext) {
+  public void successfulRequestSendsEventBusMessage(Vertx vertx, VertxTestContext testContext) {
 
     stubFor(get("/test").willReturn(aResponse().withBody("test")));
 
     WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhost:8080/test");
     vertx.deployVerticle(webClientVerticle);
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("succeeded");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_SUCCESS);
 
     consumer.handler(message -> {
       testContext.verify(() -> {
-        assertTrue(message.body().containsKey("url"));
-        assertTrue(message.body().containsKey("bodySize"));
+        assertTrue(message.body().containsKey(ResultMessage.URL));
+        assertTrue(message.body().containsKey(ResultMessage.BODY_SIZE));
       });
       testContext.completeNow();
     });
@@ -74,10 +98,10 @@ class WebClientVerticleTest {
     WebClientVerticle webClientVerticle = new WebClientVerticle(url);
     vertx.deployVerticle(webClientVerticle);
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("succeeded");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_SUCCESS);
 
     consumer.handler(message -> {
-      testContext.verify(() -> assertEquals(url, message.body().getString("url")));
+      testContext.verify(() -> assertEquals(url, message.body().getString(ResultMessage.URL)));
       testContext.completeNow();
     });
   }
@@ -91,10 +115,10 @@ class WebClientVerticleTest {
     WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhost:8080/test");
     vertx.deployVerticle(webClientVerticle);
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("succeeded");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_SUCCESS);
 
     consumer.handler(message -> {
-      testContext.verify(() -> assertEquals(body.length(), message.body().getInteger("bodySize")));
+      testContext.verify(() -> assertEquals(body.length(), message.body().getInteger(ResultMessage.BODY_SIZE)));
       testContext.completeNow();
     });
   }
@@ -115,12 +139,12 @@ class WebClientVerticleTest {
     WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhos");
     vertx.deployVerticle(webClientVerticle);
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("failed");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
 
     consumer.handler(message -> {
       testContext.verify(() -> {
-        assertTrue(message.body().containsKey("url"));
-        assertFalse(message.body().containsKey("bodySize"));
+        assertTrue(message.body().containsKey(ResultMessage.URL));
+        assertFalse(message.body().containsKey(ResultMessage.BODY_SIZE));
       });
       testContext.completeNow();
     });
@@ -133,10 +157,10 @@ class WebClientVerticleTest {
     WebClientVerticle webClientVerticle = new WebClientVerticle(url);
     vertx.deployVerticle(webClientVerticle);
 
-    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer("failed");
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
 
     consumer.handler(message -> {
-      testContext.verify(() -> assertEquals(url, message.body().getString("url")));
+      testContext.verify(() -> assertEquals(url, message.body().getString(ResultMessage.URL)));
       testContext.completeNow();
     });
   }
