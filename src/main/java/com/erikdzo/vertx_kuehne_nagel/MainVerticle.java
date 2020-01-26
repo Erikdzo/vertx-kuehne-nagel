@@ -1,6 +1,8 @@
 package com.erikdzo.vertx_kuehne_nagel;
 
+import com.erikdzo.vertx_kuehne_nagel.utils.EventAddress;
 import io.vertx.core.*;
+import io.vertx.core.eventbus.Message;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,19 +21,43 @@ public class MainVerticle extends AbstractVerticle {
   public void start() {
     vertx.deployVerticle(new ReportVerticle());
 
-    List<Future<String>> futureList = Arrays.asList(
-      deployWebClientVerticle(vertx, "https://www.youtube.com/"),
-      deployWebClientVerticle(vertx, "https://www.google.com/"),
-      deployWebClientVerticle(vertx, "https://www.face"),
-      deployWebClientVerticle(vertx, "https://jsonplaceholder.typicode.com/posts/1")
+    List<String> urls = Arrays.asList(
+      "https://www.youtube.com/",
+      "https://www.google.com/",
+      "https://www.face",
+      "https://jsonplaceholder.typicode.com/posts/1"
     );
+
+    List<Future<String>> futureList = new ArrayList<>();
+
+    urls.forEach(url -> futureList.add(deployWebClientVerticle(vertx, url)));
 
     CompositeFuture.join(new ArrayList<>(futureList))
       .onComplete(handler ->
-        vertx.eventBus().request("report", true, ar -> {
-          if (ar.succeeded()) {
-            System.out.println(ar.result().body());
-          }
-        }));
+        vertx.eventBus().request(EventAddress.REPORT, true, handleResponse()));
+  }
+
+  private Handler<AsyncResult<Message<Object>>> handleResponse() {
+    return handler -> {
+      if (handler.succeeded()) {
+        System.out.println(handler.result().body());
+      }
+      closeApp();
+    };
+  }
+
+  private void closeApp() {
+    this.vertx.close(handler -> {
+      if (handler.succeeded()) {
+        System.out.println("Closed Vert.x app");
+      } else {
+        System.out.println("Failed to close" + handler.cause());
+      }
+    });
+  }
+
+  public static void main(String[] args) {
+    Vertx vertx = Vertx.vertx();
+    vertx.deployVerticle(new MainVerticle());
   }
 }

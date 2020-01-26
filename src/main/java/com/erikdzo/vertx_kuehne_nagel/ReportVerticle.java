@@ -1,5 +1,7 @@
 package com.erikdzo.vertx_kuehne_nagel;
 
+import com.erikdzo.vertx_kuehne_nagel.utils.EventAddress;
+import com.erikdzo.vertx_kuehne_nagel.utils.ResultMessage;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
@@ -20,14 +22,13 @@ public class ReportVerticle extends AbstractVerticle {
   @Override
   public void start() {
 
-    MessageConsumer<JsonObject> successConsumer = vertx.eventBus().consumer("succeeded");
-    MessageConsumer<JsonObject> failureConsumer = vertx.eventBus().consumer("failed");
-    MessageConsumer<JsonObject> reportConsumer = vertx.eventBus().consumer("report");
+    MessageConsumer<JsonObject> successConsumer = vertx.eventBus().consumer(EventAddress.REQUEST_SUCCESS);
+    MessageConsumer<JsonObject> failConsumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
+    MessageConsumer<JsonObject> reportConsumer = vertx.eventBus().consumer(EventAddress.REPORT);
 
     successConsumer.handler(message -> succeededRequestList.add(message.body()));
-    failureConsumer.handler(message -> failedRequestsList.add(message.body()));
+    failConsumer.handler(message -> failedRequestsList.add(message.body()));
     reportConsumer.handler(message -> message.reply(report()));
-
   }
 
   private String report() {
@@ -66,8 +67,7 @@ public class ReportVerticle extends AbstractVerticle {
     }
 
     int total = succeededRequestList.stream()
-      .filter(message -> message.getBoolean("success"))
-      .map(message -> message.getInteger("bodySize"))
+      .map(message -> message.getInteger(ResultMessage.BODY_SIZE))
       .reduce(0, Integer::sum);
 
 
@@ -84,11 +84,11 @@ public class ReportVerticle extends AbstractVerticle {
   }
 
   private String formatSucceededRequest(JsonObject requestJson) {
-    return String.format("URL: %s SIZE (bytes): %d\n", requestJson.getString("url"), requestJson.getInteger("bodySize"));
+    return String.format("URL: %s SIZE (bytes): %d\n", requestJson.getString(ResultMessage.URL), requestJson.getInteger(ResultMessage.BODY_SIZE));
   }
 
   private String formatFailedRequest(JsonObject requestJson) {
-    return String.format("URL: %s\n", requestJson.getString("url"));
+    return String.format("URL: %s\n", requestJson.getString(ResultMessage.URL));
   }
 
   private String reportFooter() {
