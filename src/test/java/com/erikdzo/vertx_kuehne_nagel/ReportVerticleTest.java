@@ -1,5 +1,6 @@
 package com.erikdzo.vertx_kuehne_nagel;
 
+import com.erikdzo.vertx_kuehne_nagel.utils.EventAddress;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
@@ -48,7 +49,7 @@ class ReportVerticleTest {
 
     vertx.deployVerticle(reportVerticle);
     vertx.deployVerticle(webClientVerticle, handler ->
-      vertx.eventBus().request("report", true, ar -> {
+      vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
         testContext.verify(() -> assertEquals(expected, ar.result().body()));
         testContext.completeNow();
       }));
@@ -66,7 +67,7 @@ class ReportVerticleTest {
 
     vertx.deployVerticle(reportVerticle);
 
-    vertx.eventBus().request("report", true, ar -> {
+    vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
       testContext.verify(() -> assertEquals(expected, ar.result().body()));
       testContext.completeNow();
     });
@@ -93,7 +94,7 @@ class ReportVerticleTest {
       deployWebClientVerticle(vertx, "http://localhost:8080/test"),
       deployWebClientVerticle(vertx, "http://loca"))
       .onComplete(handler ->
-        vertx.eventBus().request("report", true, ar -> {
+        vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
           testContext.verify(() -> assertEquals(expected, ar.result().body()));
           testContext.completeNow();
         }));
