@@ -19,10 +19,9 @@ public class MainVerticle extends AbstractVerticle {
 
   @Override
   public void start() {
-    vertx.deployVerticle(new ReportVerticle());
 
     List<String> urls = Arrays.asList(
-      "https://www.youtube.com/",
+      "asd",
       "https://www.google.com/",
       "https://www.face",
       "https://jsonplaceholder.typicode.com/posts/1"
@@ -30,11 +29,11 @@ public class MainVerticle extends AbstractVerticle {
 
     List<Future<String>> futureList = new ArrayList<>();
 
+    vertx.deployVerticle(new ReportVerticle());
     urls.forEach(url -> futureList.add(deployWebClientVerticle(vertx, url)));
 
     CompositeFuture.join(new ArrayList<>(futureList))
-      .onComplete(handler ->
-        vertx.eventBus().request(EventAddress.REPORT, true, handleResponse()));
+      .onComplete(handler -> vertx.eventBus().request(EventAddress.REPORT, true, handleResponse()));
   }
 
   private Handler<AsyncResult<Message<Object>>> handleResponse() {

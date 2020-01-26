@@ -24,17 +24,17 @@ public class WebClientVerticle extends AbstractVerticle {
 
     System.out.printf("Requesting %s...\n", this.url);
 
-    JsonObject jsonResult = new JsonObject();
     EventBus eventBus = vertx.eventBus();
+    JsonObject jsonResult = new JsonObject();
 
     jsonResult.put(ResultMessage.URL, this.url);
 
     try {
       WebClient.create(vertx)
         .getAbs(this.url)
-        .send(ar -> {
-            if (ar.succeeded()) {
-              HttpResponse<Buffer> response = ar.result();
+        .send(handler -> {
+            if (handler.succeeded()) {
+              HttpResponse<Buffer> response = handler.result();
               String responseBody = response.bodyAsString();
 
               System.out.printf("Received response from %s with status code %d\n", this.url, response.statusCode());
@@ -44,17 +44,18 @@ public class WebClientVerticle extends AbstractVerticle {
 
               startPromise.complete();
             } else {
-              System.out.printf("Something went wrong: %s\n", ar.cause().getMessage());
-
+              System.out.printf("Something went wrong: %s\n", handler.cause().getMessage());
               eventBus.send(EventAddress.REQUEST_FAIL, jsonResult);
-
               startPromise.fail(String.format("Requesting %s failed", this.url));
             }
           }
         );
     } catch (VertxException e) {
       eventBus.send(EventAddress.REQUEST_FAIL, jsonResult);
-      startPromise.fail(String.format("Invalid url %s", this.url));
+      System.out.println(e.getMessage());
+      startPromise.fail(e.getMessage());
     }
   }
+
+
 }
