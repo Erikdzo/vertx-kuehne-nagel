@@ -49,8 +49,8 @@ class ReportVerticleTest {
 
     vertx.deployVerticle(reportVerticle);
     vertx.deployVerticle(webClientVerticle, handler ->
-      vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
-        testContext.verify(() -> assertEquals(expected, ar.result().body()));
+      vertx.eventBus().request(EventAddress.REPORT, true, responseHandler -> {
+        testContext.verify(() -> assertEquals(expected, responseHandler.result().body()));
         testContext.completeNow();
       }));
   }
@@ -67,8 +67,8 @@ class ReportVerticleTest {
 
     vertx.deployVerticle(reportVerticle);
 
-    vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
-      testContext.verify(() -> assertEquals(expected, ar.result().body()));
+    vertx.eventBus().request(EventAddress.REPORT, true, handler -> {
+      testContext.verify(() -> assertEquals(expected, handler.result().body()));
       testContext.completeNow();
     });
   }
@@ -81,7 +81,7 @@ class ReportVerticleTest {
       "SUCCEEDED:\n" +
       "URL: http://localhost:8080/test SIZE (bytes): 4\n" +
       "FAILED:\n" +
-      "URL: http://loca\n" +
+      "URL: http://loca CAUSE: [failed to resolve 'loca' after 3 queries ]\n" +
       "TOTAL SIZE (bytes): 4\n" +
       "AVERAGE SIZE (bytes): 4\n" +
       "----------------------------------------";
@@ -94,8 +94,59 @@ class ReportVerticleTest {
       deployWebClientVerticle(vertx, "http://localhost:8080/test"),
       deployWebClientVerticle(vertx, "http://loca"))
       .onComplete(handler ->
-        vertx.eventBus().request(EventAddress.REPORT, true, ar -> {
-          testContext.verify(() -> assertEquals(expected, ar.result().body()));
+        vertx.eventBus().request(EventAddress.REPORT, true, responseHandler -> {
+          testContext.verify(() -> assertEquals(expected, responseHandler.result().body()));
+          testContext.completeNow();
+        }));
+  }
+
+  @Test
+  public void reportCorrectWithTwoSuccessfulRequest(Vertx vertx, VertxTestContext testContext) {
+    String expected = "REPORT\n" +
+      "----------------------------------------\n" +
+      "2 requests succeeded 0 failed\n" +
+      "SUCCEEDED:\n" +
+      "URL: http://localhost:8080/test SIZE (bytes): 4\n" +
+      "URL: http://localhost:8080/test SIZE (bytes): 4\n" +
+      "TOTAL SIZE (bytes): 8\n" +
+      "AVERAGE SIZE (bytes): 4\n" +
+      "----------------------------------------";
+    stubFor(get("/test").willReturn(aResponse().withBody("test")));
+
+    ReportVerticle reportVerticle = new ReportVerticle();
+
+    vertx.deployVerticle(reportVerticle);
+    CompositeFuture.join(
+      deployWebClientVerticle(vertx, "http://localhost:8080/test"),
+      deployWebClientVerticle(vertx, "http://localhost:8080/test"))
+      .onComplete(handler ->
+        vertx.eventBus().request(EventAddress.REPORT, true, responseHandler -> {
+          testContext.verify(() -> assertEquals(expected, responseHandler.result().body()));
+          testContext.completeNow();
+        }));
+  }
+
+  @Test
+  public void reportCorrectWithTwoFailedRequest(Vertx vertx, VertxTestContext testContext) {
+    String expected = "REPORT\n" +
+      "----------------------------------------\n" +
+      "0 requests succeeded 2 failed\n" +
+      "FAILED:\n" +
+      "URL: asd wdapwmd CAUSE: [Invalid url: asd wdapwmd]\n" +
+      "URL: http://local CAUSE: [failed to resolve 'local' after 3 queries ]\n" +
+      "TOTAL SIZE (bytes): 0\n" +
+      "AVERAGE SIZE (bytes): 0\n" +
+      "----------------------------------------";
+
+    ReportVerticle reportVerticle = new ReportVerticle();
+
+    vertx.deployVerticle(reportVerticle);
+    CompositeFuture.join(
+      deployWebClientVerticle(vertx, "http://local"),
+      deployWebClientVerticle(vertx, "asd wdapwmd"))
+      .onComplete(handler ->
+        vertx.eventBus().request(EventAddress.REPORT, true, responseHandler -> {
+          testContext.verify(() -> assertEquals(expected, responseHandler.result().body()));
           testContext.completeNow();
         }));
   }

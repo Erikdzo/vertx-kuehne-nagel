@@ -37,7 +37,7 @@ class WebClientVerticleTest {
   }
 
   @Test
-  public void successfulRequestPromiseComplete(Vertx vertx, VertxTestContext testContext) {
+  public void correctUrlVerticlePromiseComplete(Vertx vertx, VertxTestContext testContext) {
     stubFor(get("/test").willReturn(aResponse().withBody("test")));
 
     WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhost:8080/test");
@@ -48,9 +48,45 @@ class WebClientVerticleTest {
   }
 
   @Test
-  public void webClientVerticleURLNullSendFailedMessage(Vertx vertx, VertxTestContext testContext) {
-    WebClientVerticle webClientVerticle = new WebClientVerticle(null);
+  public void brokenUrlRequestVerticlePromiseFailed(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhos");
+    vertx.deployVerticle(webClientVerticle, handler -> {
+      testContext.verify(() -> assertTrue(handler.failed()));
+      testContext.completeNow();
+    });
+  }
 
+  @Test
+  public void nonUrlRequestVerticlePromiseFailed(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle("test");
+    vertx.deployVerticle(webClientVerticle, handler -> {
+      testContext.verify(() -> assertTrue(handler.failed()));
+      testContext.completeNow();
+    });
+  }
+
+  @Test
+  public void invalidPathVerticlePromiseFailed(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhost:8080/test");
+    vertx.deployVerticle(webClientVerticle, handler -> {
+      testContext.verify(() -> assertTrue(handler.failed()));
+      testContext.completeNow();
+    });
+  }
+
+  @Test
+  public void nullUrlRequestVerticlePromiseFailed(Vertx vertx, VertxTestContext testContext) {
+    stubFor(get("/test").willReturn(aResponse().withBody("test")));
+
+    WebClientVerticle webClientVerticle = new WebClientVerticle(null);
+    vertx.deployVerticle(webClientVerticle, handler -> {
+      testContext.verify(() -> assertTrue(handler.failed()));
+      testContext.completeNow();
+    });
+  }
+  @Test
+  public void nullURLRequestSendFailedMessage(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle(null);
     vertx.deployVerticle(webClientVerticle);
 
     MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
@@ -59,9 +95,18 @@ class WebClientVerticleTest {
   }
 
   @Test
-  public void webClientVerticleURLPlainStringSendsFailedMessage(Vertx vertx, VertxTestContext testContext) {
+  public void plainStringRequestSendsFailedMessage(Vertx vertx, VertxTestContext testContext) {
     WebClientVerticle webClientVerticle = new WebClientVerticle("test string");
+    vertx.deployVerticle(webClientVerticle);
 
+    MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
+
+    consumer.handler(message -> testContext.completeNow());
+  }
+
+  @Test
+  public void invalidPathURLRequestSendsFailedMessage(Vertx vertx, VertxTestContext testContext) {
+    WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhost:8080/test");
     vertx.deployVerticle(webClientVerticle);
 
     MessageConsumer<JsonObject> consumer = vertx.eventBus().consumer(EventAddress.REQUEST_FAIL);
@@ -84,6 +129,7 @@ class WebClientVerticleTest {
       testContext.verify(() -> {
         assertTrue(message.body().containsKey(ResultMessage.URL));
         assertTrue(message.body().containsKey(ResultMessage.BODY_SIZE));
+        assertFalse(message.body().containsKey(ResultMessage.ERROR));
       });
       testContext.completeNow();
     });
@@ -124,17 +170,6 @@ class WebClientVerticleTest {
   }
 
   @Test
-  public void failedRequestPromiseComplete(Vertx vertx, VertxTestContext testContext) {
-    stubFor(get("/test").willReturn(aResponse().withBody("test")));
-
-    WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhos");
-    vertx.deployVerticle(webClientVerticle, handler -> {
-      testContext.verify(() -> assertTrue(handler.failed()));
-      testContext.completeNow();
-    });
-  }
-
-  @Test
   public void failedRequestSendEventBusMessage(Vertx vertx, VertxTestContext testContext) {
     WebClientVerticle webClientVerticle = new WebClientVerticle("http://localhos");
     vertx.deployVerticle(webClientVerticle);
@@ -144,6 +179,7 @@ class WebClientVerticleTest {
     consumer.handler(message -> {
       testContext.verify(() -> {
         assertTrue(message.body().containsKey(ResultMessage.URL));
+        assertTrue(message.body().containsKey(ResultMessage.ERROR));
         assertFalse(message.body().containsKey(ResultMessage.BODY_SIZE));
       });
       testContext.completeNow();
