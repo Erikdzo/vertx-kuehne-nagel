@@ -23,7 +23,7 @@ public class MainVerticle extends AbstractVerticle {
     List<String> urls = Arrays.asList(
       "asd",
       "https://www.google.com/",
-      "https://www.face",
+      "https://www.facebook.com/test/test",
       "https://jsonplaceholder.typicode.com/posts/1"
     );
 
@@ -40,7 +40,10 @@ public class MainVerticle extends AbstractVerticle {
     return handler -> {
       if (handler.succeeded()) {
         System.out.println(handler.result().body());
+      } else {
+        System.out.println("Failed to get response");
       }
+
       closeApp();
     };
   }
