@@ -21,7 +21,7 @@ public class MainVerticle extends AbstractVerticle {
   public void start() {
 
     List<String> urls = Arrays.asList(
-      "asd",
+      "https://www.youtube.com",
       "https://www.google.com/",
       "https://www.facebook.com/test/test",
       "https://jsonplaceholder.typicode.com/posts/1"
