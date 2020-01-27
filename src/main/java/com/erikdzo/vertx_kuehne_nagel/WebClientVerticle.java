@@ -6,7 +6,6 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.VertxException;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
@@ -21,13 +20,7 @@ public class WebClientVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> startPromise) {
-
     System.out.printf("Requesting %s...\n", this.url);
-
-    EventBus eventBus = vertx.eventBus();
-    JsonObject jsonResult = new JsonObject();
-
-    jsonResult.put(ResultMessage.URL, this.url);
 
     try {
       WebClient.create(vertx)
@@ -35,27 +28,46 @@ public class WebClientVerticle extends AbstractVerticle {
         .send(handler -> {
             if (handler.succeeded()) {
               HttpResponse<Buffer> response = handler.result();
-              String responseBody = response.bodyAsString();
-
-              System.out.printf("Received response from %s with status code %d\n", this.url, response.statusCode());
-
-              jsonResult.put(ResultMessage.BODY_SIZE, responseBody.length());
-              eventBus.send(EventAddress.REQUEST_SUCCESS, jsonResult);
-
-              startPromise.complete();
+              if (response.statusCode() == 200) {
+                handleSuccess(response);
+                startPromise.complete();
+              } else {
+                handleFailure(response.statusMessage());
+                startPromise.fail(String.format("Invalid status code from %s", this.url));
+              }
             } else {
-              System.out.printf("Something went wrong: %s\n", handler.cause().getMessage());
-              eventBus.send(EventAddress.REQUEST_FAIL, jsonResult);
+              handleFailure(handler.cause().getMessage());
               startPromise.fail(String.format("Requesting %s failed", this.url));
             }
           }
         );
     } catch (VertxException e) {
-      eventBus.send(EventAddress.REQUEST_FAIL, jsonResult);
-      System.out.println(e.getMessage());
-      startPromise.fail(e.getMessage());
+      handleFailure(e.getMessage());
+      startPromise.fail(String.format("WebClient failed: %s", e.getMessage()));
     }
   }
 
+  public void handleSuccess(HttpResponse<Buffer> response) {
+    System.out.printf("Received response from %s with status code %d\n", this.url, response.statusCode());
+    JsonObject json = new JsonObject();
+
+    json
+      .put(ResultMessage.URL, this.url)
+      .put(ResultMessage.BODY_SIZE, response.body().length());
+
+    vertx.eventBus().send(EventAddress.REQUEST_SUCCESS, json);
+  }
+
+  public void handleFailure(String msg) {
+    System.out.printf("%s failed: %s\n", this.url, msg);
+
+    JsonObject json = new JsonObject();
+
+    json
+      .put(ResultMessage.URL, this.url)
+      .put(ResultMessage.ERROR, msg);
+
+    vertx.eventBus().send(EventAddress.REQUEST_FAIL, json);
+  }
 
 }
