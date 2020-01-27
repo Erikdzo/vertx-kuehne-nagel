@@ -53,7 +53,7 @@ public class MainVerticle extends AbstractVerticle {
       if (handler.succeeded()) {
         System.out.println("Closed Vert.x app");
       } else {
-        System.out.println("Failed to close" + handler.cause());
+        System.out.printf("Failed to close app %s", handler.cause());
       }
     });
   }
