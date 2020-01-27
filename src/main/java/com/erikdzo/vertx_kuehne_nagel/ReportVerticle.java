@@ -88,7 +88,7 @@ public class ReportVerticle extends AbstractVerticle {
   }
 
   private String formatFailedRequest(JsonObject requestJson) {
-    return String.format("URL: %s\n", requestJson.getString(ResultMessage.URL));
+    return String.format("URL: %s CAUSE: [%s]\n", requestJson.getString(ResultMessage.URL), requestJson.getString("error"));
   }
 
   private String reportFooter() {
